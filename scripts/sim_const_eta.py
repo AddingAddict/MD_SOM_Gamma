@@ -89,7 +89,7 @@ for idx_rep in range(first_rep,nrep):
     hs = g*cs[:,np.newaxis] + b
 
     vs,rs,_ = sfun.sim_rates_mult(rp,T,W,hs)
-    As = sfun.calc_lfp_mult(rp,Wlfp,np.sqrt(hs),syn_taus,corr_tau,vs,fs)
+    As = sfun.calc_lfp_mult(rp,Wlfp,np.ones_like(hs),syn_taus,corr_tau,vs,fs)
 
     print(vs)
     print()

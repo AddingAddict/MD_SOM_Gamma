@@ -56,12 +56,12 @@ def sim_rates_mult(rpl,T,W,hs,max_min=2):
 
     return vs,rs,timeouts
 
-def calc_lfp(rpl,Ws,h,syn_taus,corr_tau,v,fs):
+def calc_lfp(rpl,Ws,eta_A,syn_taus,corr_tau,v,fs):
     nc = rpl.n_types
     ns = len(syn_taus)
 
     eta = np.zeros(ns*nc)
-    eta[:nc] = np.sqrt(h)
+    eta[:nc] = eta_A
 
     e = np.zeros(ns*nc)
     e[::ns] = 1
@@ -84,10 +84,10 @@ def calc_lfp(rpl,Ws,h,syn_taus,corr_tau,v,fs):
         As[i] = np.vdot(Ginveta,Ginveta)*2*corr_tau/((2*np.pi*fs[i]*corr_tau)**2+1)
     return As
 
-def calc_lfp_mult(rpl,Ws,hs,syn_taus,corr_tau,vs,fs):
-    As = np.zeros((len(fs),len(hs)))
+def calc_lfp_mult(rpl,Ws,eta_As,syn_taus,corr_tau,vs,fs):
+    As = np.zeros((len(fs),len(vs)))
 
-    for idx in range(len(hs)):
-        As[:,idx] = calc_lfp(rpl,Ws,hs[idx],syn_taus,corr_tau,vs[idx],fs)
+    for idx in range(len(vs)):
+        As[:,idx] = calc_lfp(rpl,Ws,eta_As[idx],syn_taus,corr_tau,vs[idx],fs)
 
     return As
