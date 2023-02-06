@@ -28,7 +28,7 @@ corr_tau = 0.005
 T = np.arange(0,10,rp.taus[1]/3)
 
 resultsdir = './../results/'
-name_results = 'sim_results'+'-'+str(jn)+'.txt'
+name_results = 'sim_const_eta_results'+'-'+str(jn)+'.txt'
 this_results = resultsdir+name_results
 print('Saving all results in '+  name_results)
 print(' ')
