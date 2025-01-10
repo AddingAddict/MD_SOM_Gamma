@@ -8,9 +8,8 @@ except:
     
 import numpy as np
 import torch
-from sbi.inference import NPE
+from sbi.analysis import pairplot
 from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
     process_prior,
     process_simulator,
 )
@@ -26,22 +25,32 @@ else:
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--frn', '-frn',  help='nominal value of peak frequency (Hz)', type=float, default=43.0)
+parser.add_argument('--frs', '-frs',  help='uncertainty of peak frequency (Hz)', type=float, default=1.0)
+parser.add_argument('--wrn', '-wrn',  help='nominal value of peak width (Hz)', type=float, default=5.0)
+parser.add_argument('--wrs', '-wrs',  help='uncertainty of peak width (Hz)', type=float, default=1.0)
+parser.add_argument('--Arn', '-Arn',  help='nominal value of peak amplitude relative to 50 Hz', type=float, default=2.0)
+parser.add_argument('--Ars', '-Ars',  help='uncertainty of peak amplitude relative to 50 Hz', type=float, default=0.5)
 parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
 parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
-parser.add_argument('--max_coup', '-maxW',  help='maximum effective coupling magnitude', type=float, default=200)
-parser.add_argument('--max_corr', '-maxc',  help='maximum correlation coefficient for E/I noise', type=float, default=1)
-parser.add_argument('--max_Iamp', '-maxa',  help='maximum ratio of I to E noise amplitude', type=float, default=2)
 parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
+parser.add_argument('--num_samp', '-p',  help='number of posterior samples', type=int, default=10000000)
 
 args = vars(parser.parse_args())
 print(parser.parse_args())
 
+frn = args['frn']
+frs = args['frs']
+wrn = args['wrn']
+wrs = args['wrs']
+Arn = args['Arn']
+Ars = args['Ars']
 tE = args['tE']
 tI = args['tI']
-maxW = args['max_coup']
-maxc = args['max_corr']
-maxa = args['max_Iamp']
 num_simulations = args['num_sim']
+num_samples = args['num_samp']
+
+test_samples = 100000
 
 t = torch.tensor([tE,tI])
 
@@ -78,9 +87,9 @@ def simulator(theta):
     return torch.tensor([fr,wr,Ar])
 
 prior = CoupCorrDist(torch.tensor([0.05],device=device),
-                     torch.tensor([maxW],device=device),
+                     torch.tensor([200],device=device),
                      torch.tensor([0.0,0.0],device=device),
-                     torch.tensor([maxc,maxa],device=device),True)
+                     torch.tensor([1.0,2.0],device=device),True)
 
 # Check prior, return PyTorch prior.
 prior, num_parameters, prior_returns_numpy = process_prior(prior)
@@ -88,27 +97,34 @@ prior, num_parameters, prior_returns_numpy = process_prior(prior)
 # Check simulator, returns PyTorch simulator able to simulate batches.
 simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-# Consistency check after making ready for sbi.
-check_sbi_inputs(simulator, prior)
+with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'rb') as handle:
+    posterior = pickle.load(handle)
 
-inference = NPE(prior=prior,device=device)
-
-start = time.process_time()
-
-theta = prior.sample((num_simulations,)).to(device)
-x = simulator(theta).to(device)
-
-print('Sampling and simulating took',time.process_time()-start,'s')
+x_obs = torch.tensor([frn,wrn,Arn])
+x_err = torch.tensor([frs,wrs,Ars])
 
 start = time.process_time()
 
-inference = inference.append_simulations(theta, x)
-density_estimator = inference.train()
+samples = posterior.sample((test_samples,), x=x_obs)
+in_err = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1))<1
+in_err_frac = in_err.sum().item() / test_samples
+required_samples = int(num_samples/in_err_frac*1.05)
+print('required samples:', required_samples)
 
-print()
+print('Test sampling took',time.process_time()-start,'s')
+
+start = time.process_time()
+
+samples = posterior.sample((required_samples,), x=x_obs)
+in_err = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1))<1
+samples = samples[in_err,:]
+print(samples.shape)
+
+print('Sampling the required number for desired sample size took',time.process_time()-start,'s')
+
+start = time.process_time()
+
 print('Inference training took',time.process_time()-start,'s')
 
-posterior = inference.build_posterior(density_estimator)
-
-with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'wb') as handle:
+with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_fr={:.1f}+-{:.1f}_wr={:1f}+-{:.1f}_Ar={:.1f}+-{:.1f}_n={:d}_d={:s}.pkl'.format(tE,tI,frn,frs,wrn,wrs,Arn,Ars,num_samples,str(device)), 'wb') as handle:
     pickle.dump(posterior,handle)
