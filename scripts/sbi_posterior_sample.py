@@ -5,7 +5,7 @@ try:
     import pickle5 as pickle
 except:
     import pickle
-    
+
 import numpy as np
 import torch
 from sbi.analysis import pairplot
@@ -25,12 +25,7 @@ else:
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--frn', '-frn',  help='nominal value of peak frequency (Hz)', type=float, default=43.0)
-parser.add_argument('--frs', '-frs',  help='uncertainty of peak frequency (Hz)', type=float, default=1.0)
-parser.add_argument('--wrn', '-wrn',  help='nominal value of peak width (Hz)', type=float, default=5.0)
-parser.add_argument('--wrs', '-wrs',  help='uncertainty of peak width (Hz)', type=float, default=1.0)
-parser.add_argument('--Arn', '-Arn',  help='nominal value of peak amplitude relative to 50 Hz', type=float, default=2.0)
-parser.add_argument('--Ars', '-Ars',  help='uncertainty of peak amplitude relative to 50 Hz', type=float, default=0.5)
+parser.add_argument('--obs_file', '-o',  help='file name of the observed data', required=True)
 parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
 parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
 parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
@@ -39,12 +34,7 @@ parser.add_argument('--num_samp', '-p',  help='number of posterior samples', typ
 args = vars(parser.parse_args())
 print(parser.parse_args())
 
-frn = args['frn']
-frs = args['frs']
-wrn = args['wrn']
-wrs = args['wrs']
-Arn = args['Arn']
-Ars = args['Ars']
+obs_file = args['obs_file']
 tE = args['tE']
 tI = args['tI']
 num_simulations = args['num_sim']
@@ -97,6 +87,15 @@ prior, num_parameters, prior_returns_numpy = process_prior(prior)
 # Check simulator, returns PyTorch simulator able to simulate batches.
 simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
+with open(obs_file, 'rb') as handle:
+    obs_dict = pickle.load(handle)
+    frn = obs_dict['frn']
+    frs = obs_dict['frs']
+    wrn = obs_dict['wrn']
+    wrs = obs_dict['wrs']
+    Arn = obs_dict['Arn']
+    Ars = obs_dict['Ars']
+
 with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'rb') as handle:
     posterior = pickle.load(handle)
 
@@ -126,5 +125,5 @@ start = time.process_time()
 
 print('Inference training took',time.process_time()-start,'s')
 
-with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_fr={:.1f}+-{:.1f}_wr={:1f}+-{:.1f}_Ar={:.1f}+-{:.1f}_n={:d}_d={:s}.pkl'.format(tE,tI,frn,frs,wrn,wrs,Arn,Ars,num_samples,str(device)), 'wb') as handle:
+with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_o={:s}_n={:d}_d={:s}.pkl'.format(tE,tI,obs_file,num_samples,str(device)), 'wb') as handle:
     pickle.dump(posterior,handle)
