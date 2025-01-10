@@ -6,15 +6,17 @@ from bounded_exponential import BoundedExponential
 
 class CoupCorrDist(torch.distributions.Distribution):
     def __init__(self, rate, coup_mag_bound, corr_lo_bound, corr_up_bound, validate_args=None):
+        self.device = rate.device
         self.rate = rate
         self.coup_mag_bound = coup_mag_bound
         self.corr_lo_bound, self.corr_up_bound = corr_lo_bound, corr_up_bound
         self.corr_dim = corr_lo_bound.size(0)
-        self.coup_dist = BoundedExponential(self.rate,torch.zeros(4),self.coup_mag_bound*torch.ones(4))
+        self.coup_dist = BoundedExponential(rate,torch.zeros(4,device=self.device),
+                                            coup_mag_bound*torch.ones(4,device=self.device))
         self.corr_dist = Uniform(self.corr_lo_bound,self.corr_up_bound)
         
-        self.lower_bound = torch.cat((torch.tensor([0,-coup_mag_bound,0,-coup_mag_bound]),corr_lo_bound))
-        self.upper_bound = torch.cat((torch.tensor([ coup_mag_bound,0, coup_mag_bound,0]),corr_up_bound))
+        self.lower_bound = torch.cat((torch.tensor([0,-coup_mag_bound,0,-coup_mag_bound],device=self.device),corr_lo_bound))
+        self.upper_bound = torch.cat((torch.tensor([ coup_mag_bound,0, coup_mag_bound,0],device=self.device),corr_up_bound))
         
         super().__init__(validate_args=validate_args)
     

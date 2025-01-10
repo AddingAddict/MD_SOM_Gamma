@@ -19,14 +19,16 @@ def runjobs():
     #--------------------------------------------------------------------------
     # Test commands option
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
-    parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
-    parser.add_argument('--max_coup', '-maxW',  help='maximum effective coupling magnitude', type=float, default=200)
-    parser.add_argument('--max_corr', '-maxc',  help='maximum correlation coefficient for E/I noise', type=float, default=1)
-    parser.add_argument('--max_Iamp', '-maxa',  help='maximum ratio of I to E noise amplitude', type=float, default=2)
-    parser.add_argument('--num_samp', '-n',  help='number of parameter samples', type=int, default=10000000)
-    parser.add_argument("--test", "-t", type=int, default=0)
-    parser.add_argument("--cluster_", help=" String", default='burg')
+    parser.add_argument('--tE', '-tE', help='excitatory time constant (s)', type=float, default=0.02)
+    parser.add_argument('--tI', '-tI', help='inhibitory time constant (s)', type=float, default=0.01)
+    parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=200)
+    parser.add_argument('--max_corr', '-maxc', help='maximum correlation coefficient for E/I noise', type=float, default=1)
+    parser.add_argument('--max_Iamp', '-maxa', help='maximum ratio of I to E noise amplitude', type=float, default=2)
+    parser.add_argument('--num_samp', '-n', help='number of parameter samples', type=int, default=10000000)
+    parser.add_argument('--test', '-t', type=int, default=0)
+    parser.add_argument('--cluster_', default='burg')
+    parser.add_argument('--gpu', '-g', type=int, help='whether to use gpu or not', default=0)
+    parser.add_argument('--mem', '-m', type=int, help='how many GB of memory to use', default=20)
     
     args2 = parser.parse_args()
     args = vars(args2)
@@ -37,6 +39,8 @@ def runjobs():
     maxc = args['max_corr']
     maxa = args['max_Iamp']
     num_simulations = args['num_samp']
+    gpu = args['gpu'] > 0
+    mem = args['mem']
     
     hostname = socket.gethostname()
     if 'ax' in hostname:
@@ -97,8 +101,8 @@ def runjobs():
     inpath = currwd + "/sbi_sample_train.py"
     c1 = "{:s} -tE {:.3f} -tI {:.3f} -maxW {:.1f} -maxc {:.1f} -maxa {:.1f} -n {:d}".format(
         inpath,tE,tI,maxW,maxc,maxa,num_simulations)
-    jobname="sbi_sample_train"+"-tE={:.3f}-tI={:.3f}-maxW={:.1f}-maxc={:.1f}-maxa={:.1f}-n={:d}".format(
-            tE,tI,maxW,maxc,maxa,num_simulations)
+    jobname="sbi_sample_train"+"-tE={:.3f}-tI={:.3f}-n={:d}".format(
+            tE,tI,num_simulations)
             
     if not args2.test:
         jobnameDir=os.path.join(ofilesdir, jobname)
@@ -108,8 +112,12 @@ def runjobs():
         if cluster=='haba' or cluster=='moto' or cluster=='burg':
             text_file.write("#SBATCH --account=theory \n")
         text_file.write("#SBATCH --job-name="+jobname+ "\n")
-        text_file.write("#SBATCH -t 0-23:59  \n")
-        text_file.write("#SBATCH --mem-per-cpu=10gb \n")
+        if gpu:
+            text_file.write("#SBATCH -t 0-11:59  \n")
+            text_file.write("#SBATCH --gres=gpu\n")
+        else:
+            text_file.write("#SBATCH -t 3-23:59  \n")
+        text_file.write("#SBATCH --mem-per-cpu={:d}gb \n".format(mem))
         text_file.write("#SBATCH -c 1 \n")
         text_file.write("#SBATCH -o "+ ofilesdir + "/%x.%j.o # STDOUT \n")
         text_file.write("#SBATCH -e "+ ofilesdir +"/%x.%j.e # STDERR \n")

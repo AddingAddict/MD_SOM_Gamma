@@ -18,6 +18,13 @@ from sbi.utils.user_input_checks import (
 
 from coup_corr_dist import CoupCorrDist
 
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+elif torch.backends.mps.is_available():
+    device = torch.device('mps')
+else:
+    device = torch.device('cpu')
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
@@ -71,7 +78,10 @@ def simulator(theta):
     
     return torch.tensor([fr,wr,Ar])
 
-prior = CoupCorrDist(torch.tensor([0.05]),torch.tensor([maxW]),torch.tensor([0.0,0.0]),torch.tensor([maxc,maxa]),True)
+prior = CoupCorrDist(torch.tensor([0.05],device=device),
+                     torch.tensor([maxW],device=device),
+                     torch.tensor([0.0,0.0],device=device),
+                     torch.tensor([maxc,maxa],device=device),True)
 
 # Check prior, return PyTorch prior.
 prior, num_parameters, prior_returns_numpy = process_prior(prior)
@@ -82,12 +92,12 @@ simulator = process_simulator(simulator, prior, prior_returns_numpy)
 # Consistency check after making ready for sbi.
 check_sbi_inputs(simulator, prior)
 
-inference = NPE(prior=prior)
+inference = NPE(prior=prior,device=device)
 
 start = time.process_time()
 
-theta = prior.sample((num_simulations,))
-x = simulator(theta)
+theta = prior.sample((num_simulations,)).to(device)
+x = simulator(theta).to(device)
 
 print('Sampling and simulating took',time.process_time()-start,'s')
 
@@ -101,5 +111,5 @@ print('Inference training took',time.process_time()-start,'s')
 
 posterior = inference.build_posterior(density_estimator)
 
-with open('./../results/gamma_posterior.pkl', 'wb') as handle:
+with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'wb') as handle:
     pickle.dump(posterior,handle)
