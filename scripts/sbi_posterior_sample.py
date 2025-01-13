@@ -87,7 +87,7 @@ prior, num_parameters, prior_returns_numpy = process_prior(prior)
 # Check simulator, returns PyTorch simulator able to simulate batches.
 simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-with open(obs_file, 'rb') as handle:
+with open('../results/'+obs_file+'.pkl', 'rb') as handle:
     obs_dict = pickle.load(handle)
     frn = obs_dict['frn']
     frs = obs_dict['frs']

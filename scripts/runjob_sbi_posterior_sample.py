@@ -24,6 +24,10 @@ def runjobs():
     parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
     parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
     parser.add_argument('--num_samp', '-p',  help='number of posterior samples', type=int, default=10000000)
+    parser.add_argument('--test', '-t', type=int, default=0)
+    parser.add_argument('--cluster_', default='burg')
+    parser.add_argument('--gpu', '-g', type=int, help='whether to use gpu or not', default=0)
+    parser.add_argument('--mem', '-m', type=int, help='how many GB of memory to use', default=20)
     
     args2 = parser.parse_args()
     args = vars(args2)
