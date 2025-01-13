@@ -126,4 +126,4 @@ start = time.process_time()
 print('Inference training took',time.process_time()-start,'s')
 
 with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_o={:s}_n={:d}_d={:s}.pkl'.format(tE,tI,obs_file,num_samples,str(device)), 'wb') as handle:
-    pickle.dump(posterior,handle)
+    pickle.dump(samples,handle)
