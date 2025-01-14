@@ -76,6 +76,25 @@ def simulator(theta):
     
     return torch.tensor([fr,wr,Ar])
 
+def max_re_eigval(theta):
+    '''
+    theta[0] = Weff_EE
+    theta[1] = Weff_EI
+    theta[2] = Weff_IE
+    theta[3] = Weff_II
+    theta[4] = r(eta_E,eta_I)
+    theta[5] = |eta_I|/|eta_E|
+    
+    returns: lam
+    lam = max(Re(eig(Weff)))
+    '''
+    tr = (theta[0]-1)/t[0] + (theta[3]-1)/t[1]
+    det = ((theta[0]-1)*(theta[3]-1) - theta[1]*theta[2])/t[0]/t[1]
+    
+    lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
+    
+    return lam
+
 prior = CoupCorrDist(torch.tensor([0.05],device=device),
                      torch.tensor([200],device=device),
                      torch.tensor([0.0,0.0],device=device),
@@ -86,6 +105,7 @@ prior, num_parameters, prior_returns_numpy = process_prior(prior)
 
 # Check simulator, returns PyTorch simulator able to simulate batches.
 simulator = process_simulator(simulator, prior, prior_returns_numpy)
+max_re_eigval = process_simulator(max_re_eigval, prior, prior_returns_numpy)
 
 with open('../results/'+obs_file+'.pkl', 'rb') as handle:
     obs_dict = pickle.load(handle)
@@ -105,9 +125,10 @@ x_err = torch.tensor([frs,wrs,Ars])
 start = time.process_time()
 
 samples = posterior.sample((test_samples,), x=x_obs)
-in_err = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1))<1
-in_err_frac = in_err.sum().item() / test_samples
-required_samples = int(num_samples/in_err_frac*1.05)
+fit_idx = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1
+fit_idx = torch.logical_and(fit_idx,max_re_eigval(samples) < 0)
+fit_frac = fit_idx.sum().item() / test_samples
+required_samples = int(num_samples/fit_frac*1.05)
 print('required samples:', required_samples)
 
 print('Test sampling took',time.process_time()-start,'s')
@@ -115,8 +136,9 @@ print('Test sampling took',time.process_time()-start,'s')
 start = time.process_time()
 
 samples = posterior.sample((required_samples,), x=x_obs)
-in_err = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1))<1
-samples = samples[in_err,:]
+fit_idx = torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1
+fit_idx = torch.logical_and(fit_idx,max_re_eigval(samples) < 0)
+samples = samples[fit_idx,:]
 print(samples.shape)
 
 print('Sampling the required number for desired sample size took',time.process_time()-start,'s')
