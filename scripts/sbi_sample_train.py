@@ -73,14 +73,18 @@ def simulator(theta):
     p0 = (theta[5]**2*theta[1]**2 - 2*theta[5]*theta[4]*theta[1]*(theta[3]-1) +\
         (theta[3]-1)**2)/t[1]**2/(2*np.pi)**2
     q0 = (theta[1]*theta[2] - (theta[0]-1)*(theta[3]-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
-    q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+(theta[3]-1)*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
+    q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+\
+        (theta[3]-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
+    
+    if q2**2 > 4*q0:
+        return torch.tensor([torch.nan,torch.nan,torch.nan])
     
     fr = torch.sqrt(torch.sqrt(p0**2-p0*q2+q0) - p0)
     # fr = torch.sqrt(torch.maximum(torch.tensor(0),torch.sqrt(p0**2-p0*q2+q0) - p0))
     Ar = 1/(q2+2*fr**2) / lfp_sign_func(50,1,p0,q0,q2)
     # Ar = lfp_sign_func(fr,1,p0,q0,q2) / lfp_sign_func(50,1,p0,q0,q2)
-    wr = torch.sqrt(-Ar/((8*(8*p0**2*q2 - (4*q0 + q2*(q2 - 4*fr**2))*fr**2 + p0*(-8*q0 + 12*q2*fr**2)))/\
-       ((-4*q0 + q2**2)**2*(p0 + fr**2))))
+    wr = torch.sqrt(-(p0+fr**2)*(q2**2-4*q0)**2/8/(q2+2*fr**2)/\
+        (4*p0*(2*p0*q2-2*q0+3*q2*fr**2)-(4*q0+q2**2-4*q2*fr**2)*fr**2))
     # wr = torch.sqrt(-Ar/lfp_sign_func_d2(fr,1,p0,q0,q2))
     
     return torch.tensor([fr,wr,Ar])
