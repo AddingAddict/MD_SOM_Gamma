@@ -8,14 +8,9 @@ except:
     
 import numpy as np
 import torch
-from sbi.inference import NPE
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 
 from coup_corr_dist import CoupCorrDist
+from sbi_util import train_posterior
 
 if torch.cuda.is_available():
     device = torch.device('cuda')
@@ -67,7 +62,7 @@ def simulator(theta):
     
     lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
     
-    if lam >= 0:
+    if lam >= 0: # prevent unstable models
         return torch.tensor([torch.nan,torch.nan,torch.nan])
     
     p0 = (theta[5]**2*theta[1]**2 - 2*theta[5]*theta[4]*theta[1]*(theta[3]-1) +\
@@ -76,7 +71,7 @@ def simulator(theta):
     q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+\
         (theta[3]-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
     
-    if q2**2 > 4*q0:
+    if q2**2 > 4*q0: # prevent unphysical solutions
         return torch.tensor([torch.nan,torch.nan,torch.nan])
     
     fr = torch.sqrt(torch.sqrt(p0**2-p0*q2+q0) - p0)
@@ -94,33 +89,7 @@ prior = CoupCorrDist(torch.tensor([0.05],device=device),
                      torch.tensor([0.0,0.0],device=device),
                      torch.tensor([maxc,maxa],device=device),True)
 
-# Check prior, return PyTorch prior.
-prior, num_parameters, prior_returns_numpy = process_prior(prior)
-
-# Check simulator, returns PyTorch simulator able to simulate batches.
-simulator = process_simulator(simulator, prior, prior_returns_numpy)
-
-# Consistency check after making ready for sbi.
-check_sbi_inputs(simulator, prior)
-
-inference = NPE(prior=prior,device=device)
-
-start = time.process_time()
-
-theta = prior.sample((num_simulations,)).to(device)
-x = simulator(theta).to(device)
-
-print('Sampling and simulating took',time.process_time()-start,'s')
-
-start = time.process_time()
-
-inference = inference.append_simulations(theta, x)
-density_estimator = inference.train()
-
-print()
-print('Inference training took',time.process_time()-start,'s')
-
-posterior = inference.build_posterior(density_estimator)
+posterior = train_posterior(prior,simulator,num_simulations,device)
 
 with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'wb') as handle:
     pickle.dump(posterior,handle)

@@ -5,16 +5,12 @@ try:
     import pickle5 as pickle
 except:
     import pickle
-
+    
 import numpy as np
 import torch
-from sbi.utils.user_input_checks import (
-    process_prior,
-    process_simulator,
-)
 
-from coup_corr_dist import CoupCorrDist
-from sbi_util import sample_posterior
+from coup_corr_dist import CoupDist
+from sbi_util import train_posterior
 
 if torch.cuda.is_available():
     device = torch.device('cuda')
@@ -28,8 +24,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--obs_file', '-o',  help='file name of the observed data', required=True)
 parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
 parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
+parser.add_argument('--max_coup', '-maxW',  help='maximum effective coupling magnitude', type=float, default=200)
 parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
-parser.add_argument('--num_samp', '-p',  help='number of posterior samples', type=int, default=10000000)
 
 args = vars(parser.parse_args())
 print(parser.parse_args())
@@ -37,12 +33,15 @@ print(parser.parse_args())
 obs_file = args['obs_file']
 tE = args['tE']
 tI = args['tI']
+maxW = args['max_coup']
 num_simulations = args['num_sim']
-num_samples = args['num_samp']
-
-test_samples = 100000
 
 t = torch.tensor([tE,tI])
+
+with open('../results/'+obs_file+'.pkl', 'rb') as handle:
+    obs_dict = pickle.load(handle)
+    c = obs_dict['c']
+    a = obs_dict['a']
 
 def lfp_sign_func(f, A, p0, q0, q2):
     return A * (p0 + f**2) / (q0 + q2*f**2 + f**4)
@@ -53,8 +52,6 @@ def simulator(theta):
     theta[1] = Weff_EI
     theta[2] = Weff_IE
     theta[3] = Weff_II
-    theta[4] = r(eta_E,eta_I)
-    theta[5] = |eta_I|/|eta_E|
     
     returns: [fr,wr,Ar]
     fr = peak frequency
@@ -69,7 +66,7 @@ def simulator(theta):
     if lam >= 0: # prevent unstable models
         return torch.tensor([torch.nan,torch.nan,torch.nan])
     
-    p0 = (theta[5]**2*theta[1]**2 - 2*theta[5]*theta[4]*theta[1]*(theta[3]-1) +\
+    p0 = (a**2*theta[1]**2 - 2*a*c*theta[1]*(theta[3]-1) +\
         (theta[3]-1)**2)/t[1]**2/(2*np.pi)**2
     q0 = (theta[1]*theta[2] - (theta[0]-1)*(theta[3]-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
     q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+\
@@ -88,57 +85,10 @@ def simulator(theta):
     
     return torch.tensor([fr,wr,Ar])
 
-def max_re_eigval(theta):
-    '''
-    theta[0] = Weff_EE
-    theta[1] = Weff_EI
-    theta[2] = Weff_IE
-    theta[3] = Weff_II
-    theta[4] = r(eta_E,eta_I)
-    theta[5] = |eta_I|/|eta_E|
-    
-    returns: lam
-    lam = max(Re(eig(Weff)))
-    '''
-    tr = (theta[0]-1)/t[0] + (theta[3]-1)/t[1]
-    det = ((theta[0]-1)*(theta[3]-1) - theta[1]*theta[2])/t[0]/t[1]
-    
-    lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
-    
-    return lam
+prior = CoupDist(torch.tensor([0.05],device=device),
+                 torch.tensor([maxW],device=device),True)
 
-prior = CoupCorrDist(torch.tensor([0.05],device=device),
-                     torch.tensor([200],device=device),
-                     torch.tensor([0.0,0.0],device=device),
-                     torch.tensor([1.0,2.0],device=device),True)
+posterior = train_posterior(prior,simulator,num_simulations,device)
 
-# Check prior, return PyTorch prior.
-prior, num_parameters, prior_returns_numpy = process_prior(prior)
-
-# Check simulator, returns PyTorch simulator able to simulate batches.
-simulator = process_simulator(simulator, prior, prior_returns_numpy)
-max_re_eigval = process_simulator(max_re_eigval, prior, prior_returns_numpy)
-
-with open('../results/'+obs_file+'.pkl', 'rb') as handle:
-    obs_dict = pickle.load(handle)
-    frn = obs_dict['frn']
-    frs = obs_dict['frs']
-    wrn = obs_dict['wrn']
-    wrs = obs_dict['wrs']
-    Arn = obs_dict['Arn']
-    Ars = obs_dict['Ars']
-
-with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_n={:d}_d={:s}.pkl'.format(tE,tI,num_simulations,str(device)), 'rb') as handle:
-    posterior = pickle.load(handle)
-
-x_obs = torch.tensor([frn,wrn,Arn])
-x_err = torch.tensor([frs,wrs,Ars])
-
-def criterion_fn(samples):
-    return torch.logical_and(torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1,
-                             max_re_eigval(samples) < 0)
-
-samples = sample_posterior(posterior,x_obs,num_samples,test_samples,criterion_fn)
-
-with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_o={:s}_n={:d}_d={:s}.pkl'.format(tE,tI,obs_file,num_samples,str(device)), 'wb') as handle:
-    pickle.dump(samples,handle)
+with open('./../results/gamma_posterior_tE={:.3f}_tI={:.3f}_o={:s}_n={:d}_d={:s}.pkl'.format(tE,tI,obs_file,num_simulations,str(device)), 'wb') as handle:
+    pickle.dump(posterior,handle)
