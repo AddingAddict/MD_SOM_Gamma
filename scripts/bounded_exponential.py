@@ -37,7 +37,7 @@ class BoundedExponential(torch.distributions.Distribution):
     def log_prob(self, value):
         if self._validate_args:
             self._validate_sample(value)
-        return self.rate.log() - self.rate * value - (self.high_exp_cdi - self.low_exp_cdi).log()
+        return torch.sum(self.rate.log() - self.rate * value - (self.high_exp_cdi - self.low_exp_cdi).log(),-1)
     
     def cdi(self, value):
         if self._validate_args:

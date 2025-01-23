@@ -60,4 +60,4 @@ class CoupCorrDist(torch.distributions.Distribution):
     def log_prob(self, value):
         coup_log_probs = self.coup_dist.log_prob(value[...,:4])
         corr_log_probs = self.corr_dist.log_prob(value[...,4:])
-        return torch.concat([coup_log_probs,corr_log_probs],dim=-1)
+        return coup_log_probs + torch.sum(corr_log_probs,-1)
