@@ -72,12 +72,6 @@ print('Computing log likelihoods took',time.process_time()-start,'s')
 
 start = time.process_time()
 
-logL = posterior.log_prob(samples) - prior.log_prob(samples)
-
-print('Computing log likelihoods took',time.process_time()-start,'s')
-
-start = time.process_time()
-
 top_one_pc = torch.topk(logL,k=num_samples//100,largest=False,sorted=False)
 top_one_pc = torch.concatenate((samples[top_one_pc.indices,:],top_one_pc.values[:,None]),dim=1)
 
