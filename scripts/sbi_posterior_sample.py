@@ -140,5 +140,14 @@ def criterion_fn(samples):
 
 samples = sample_posterior(posterior,x_obs,num_samples,test_samples,criterion_fn)
 
+posterior = posterior.set_default_x(x_obs)
+
+start = time.process_time()
+
+logL = posterior.log_prob(samples) - prior.log_prob(samples)
+samples = torch.concatenate((samples,logL[:,None]),dim=1)
+
+print('Computing log likelihoods took',time.process_time()-start,'s')
+
 with open('./../results/gamma_sample_tE={:.3f}_tI={:.3f}_o={:s}_n={:d}_d={:s}.pkl'.format(tE,tI,obs_file,num_samples,str(device)), 'wb') as handle:
     pickle.dump(samples,handle)
