@@ -28,6 +28,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--obs_file', '-o',  help='file name of the observed data', required=True)
 parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
 parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
+parser.add_argument('--max_coup', '-maxW',  help='maximum effective coupling magnitude', type=float, default=200)
+parser.add_argument('--max_corr', '-maxc',  help='maximum correlation coefficient for E/I noise', type=float, default=1)
+parser.add_argument('--max_Iamp', '-maxa',  help='maximum ratio of I to E noise amplitude', type=float, default=2)
 parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
 parser.add_argument('--num_samp', '-p',  help='number of posterior samples', type=int, default=10000000)
 
@@ -37,6 +40,9 @@ print(parser.parse_args())
 obs_file = args['obs_file']
 tE = args['tE']
 tI = args['tI']
+maxW = args['max_coup']
+maxc = args['max_corr']
+maxa = args['max_Iamp']
 num_simulations = args['num_sim']
 num_samples = args['num_samp']
 
@@ -49,10 +55,10 @@ def lfp_sign_func(f, A, p0, q0, q2):
 
 def simulator(theta):
     '''
-    theta[0] = Weff_EE
-    theta[1] = Weff_EI
-    theta[2] = Weff_IE
-    theta[3] = Weff_II
+    theta[0] = (|Weff_EE|+|Weff_II|)/2
+    theta[1] = |Weff_EI|
+    theta[2] = |Weff_IE|
+    theta[3] = (|Weff_EE|-|Weff_II|)/2
     theta[4] = r(eta_E,eta_I)
     theta[5] = |eta_I|/|eta_E|
     
@@ -61,19 +67,26 @@ def simulator(theta):
     wr = width of peak
     Ar = amplitude of peak (relative to amplitude at 50 Hz)
     '''
-    tr = (theta[0]-1)/t[0] + (theta[3]-1)/t[1]
-    det = ((theta[0]-1)*(theta[3]-1) - theta[1]*theta[2])/t[0]/t[1]
+    Weff_EE =  (theta[0] + theta[3])
+    Weff_EI = -theta[1]
+    Weff_IE =  theta[2]
+    Weff_II = -(theta[0] - theta[3])
+    c = theta[4]
+    a = theta[5]
+    
+    tr = (Weff_EE-1)/t[0] + (Weff_II-1)/t[1]
+    det = ((Weff_EE-1)*(Weff_II-1) - Weff_EI*Weff_IE)/t[0]/t[1]
     
     lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
     
     if lam >= 0: # prevent unstable models
         return torch.tensor([torch.nan,torch.nan,torch.nan])
     
-    p0 = (theta[5]**2*theta[1]**2 - 2*theta[5]*theta[4]*theta[1]*(theta[3]-1) +\
-        (theta[3]-1)**2)/t[1]**2/(2*np.pi)**2
-    q0 = (theta[1]*theta[2] - (theta[0]-1)*(theta[3]-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
-    q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+\
-        (theta[3]-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
+    p0 = (a**2*Weff_EI**2 - 2*a*c*Weff_EI*(Weff_II-1) +\
+        (Weff_II-1)**2)/t[1]**2/(2*np.pi)**2
+    q0 = (Weff_EI*Weff_IE - (Weff_EE-1)*(Weff_II-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
+    q2 = ((Weff_EE-1)*t[1]**2+2*Weff_EI*Weff_IE*t[0]*t[1]+\
+        (Weff_II-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
     
     if q2**2 > 4*q0: # prevent unphysical solutions
         return torch.tensor([torch.nan,torch.nan,torch.nan])
@@ -88,36 +101,17 @@ def simulator(theta):
     
     return torch.tensor([fr,wr,Ar])
 
-def max_re_eigval(theta):
-    '''
-    theta[0] = Weff_EE
-    theta[1] = Weff_EI
-    theta[2] = Weff_IE
-    theta[3] = Weff_II
-    theta[4] = r(eta_E,eta_I)
-    theta[5] = |eta_I|/|eta_E|
-    
-    returns: lam
-    lam = max(Re(eig(Weff)))
-    '''
-    tr = (theta[0]-1)/t[0] + (theta[3]-1)/t[1]
-    det = ((theta[0]-1)*(theta[3]-1) - theta[1]*theta[2])/t[0]/t[1]
-    
-    lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
-    
-    return lam
-
-prior = CoupCorrDist(torch.tensor([0.05],device=device),
-                     torch.tensor([200],device=device),
-                     torch.tensor([0.0,0.0],device=device),
-                     torch.tensor([1.0,2.0],device=device),True)
+prior = CoupCorrDist(torch.tensor([0.01],device=device),
+                     torch.tensor([maxW],device=device),
+                     torch.tensor([0.0,0.0,0.0],device=device),
+                     torch.tensor([1.5,maxc,maxa],device=device),
+                     num_coups=3,validate_args=True)
 
 # Check prior, return PyTorch prior.
 prior, num_parameters, prior_returns_numpy = process_prior(prior)
 
 # Check simulator, returns PyTorch simulator able to simulate batches.
 simulator = process_simulator(simulator, prior, prior_returns_numpy)
-max_re_eigval = process_simulator(max_re_eigval, prior, prior_returns_numpy)
 
 with open('../results/'+obs_file+'.pkl', 'rb') as handle:
     obs_dict = pickle.load(handle)
@@ -135,8 +129,7 @@ x_obs = torch.tensor([frn,wrn,Arn])
 x_err = torch.tensor([frs,wrs,Ars])
 
 def criterion_fn(samples):
-    return torch.logical_and(torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1,
-                             max_re_eigval(samples) < 0)
+    return torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1
 
 samples = sample_posterior(posterior,x_obs,num_samples,test_samples,criterion_fn)
 

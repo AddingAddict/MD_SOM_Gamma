@@ -45,10 +45,10 @@ def lfp_sign_func(f, A, p0, q0, q2):
 
 def simulator(theta):
     '''
-    theta[0] = Weff_EE
-    theta[1] = Weff_EI
-    theta[2] = Weff_IE
-    theta[3] = Weff_II
+    theta[0] = (|Weff_EE|+|Weff_II|)/2
+    theta[1] = |Weff_EI|
+    theta[2] = |Weff_IE|
+    theta[3] = (|Weff_EE|-|Weff_II|)/2
     theta[4] = r(eta_E,eta_I)
     theta[5] = |eta_I|/|eta_E|
     
@@ -57,19 +57,26 @@ def simulator(theta):
     wr = width of peak
     Ar = amplitude of peak (relative to amplitude at 50 Hz)
     '''
-    tr = (theta[0]-1)/t[0] + (theta[3]-1)/t[1]
-    det = ((theta[0]-1)*(theta[3]-1) - theta[1]*theta[2])/t[0]/t[1]
+    Weff_EE =  (theta[0] + theta[3])
+    Weff_EI = -theta[1]
+    Weff_IE =  theta[2]
+    Weff_II = -(theta[0] - theta[3])
+    c = theta[4]
+    a = theta[5]
+    
+    tr = (Weff_EE-1)/t[0] + (Weff_II-1)/t[1]
+    det = ((Weff_EE-1)*(Weff_II-1) - Weff_EI*Weff_IE)/t[0]/t[1]
     
     lam = 0.5*(tr + torch.sqrt(torch.maximum(torch.tensor(0),tr**2-4*det)))
     
     if lam >= 0: # prevent unstable models
         return torch.tensor([torch.nan,torch.nan,torch.nan])
     
-    p0 = (theta[5]**2*theta[1]**2 - 2*theta[5]*theta[4]*theta[1]*(theta[3]-1) +\
-        (theta[3]-1)**2)/t[1]**2/(2*np.pi)**2
-    q0 = (theta[1]*theta[2] - (theta[0]-1)*(theta[3]-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
-    q2 = ((theta[0]-1)*t[1]**2+2*theta[1]*theta[2]*t[0]*t[1]+\
-        (theta[3]-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
+    p0 = (a**2*Weff_EI**2 - 2*a*c*Weff_EI*(Weff_II-1) +\
+        (Weff_II-1)**2)/t[1]**2/(2*np.pi)**2
+    q0 = (Weff_EI*Weff_IE - (Weff_EE-1)*(Weff_II-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
+    q2 = ((Weff_EE-1)*t[1]**2+2*Weff_EI*Weff_IE*t[0]*t[1]+\
+        (Weff_II-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
     
     if q2**2 > 4*q0: # prevent unphysical solutions
         return torch.tensor([torch.nan,torch.nan,torch.nan])
@@ -84,10 +91,11 @@ def simulator(theta):
     
     return torch.tensor([fr,wr,Ar])
 
-prior = CoupCorrDist(torch.tensor([0.05],device=device),
+prior = CoupCorrDist(torch.tensor([0.01],device=device),
                      torch.tensor([maxW],device=device),
-                     torch.tensor([0.0,0.0],device=device),
-                     torch.tensor([maxc,maxa],device=device),True)
+                     torch.tensor([0.0,0.0,0.0],device=device),
+                     torch.tensor([1.5,maxc,maxa],device=device),
+                     num_coups=3,validate_args=True)
 
 posterior = train_posterior(prior,simulator,num_simulations,device)
 
