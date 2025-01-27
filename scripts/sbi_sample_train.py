@@ -75,7 +75,7 @@ def simulator(theta):
     p0 = (a**2*Weff_EI**2 - 2*a*c*Weff_EI*(Weff_II-1) +\
         (Weff_II-1)**2)/t[1]**2/(2*np.pi)**2
     q0 = (Weff_EI*Weff_IE - (Weff_EE-1)*(Weff_II-1))**2/t[0]**2/t[1]**2/(2*np.pi)**4
-    q2 = ((Weff_EE-1)*t[1]**2+2*Weff_EI*Weff_IE*t[0]*t[1]+\
+    q2 = ((Weff_EE-1)**2*t[1]**2+2*Weff_EI*Weff_IE*t[0]*t[1]+\
         (Weff_II-1)**2*t[0]**2)/t[0]**2/t[1]**2/(2*np.pi)**2
     
     if q2**2 > 4*q0: # prevent unphysical solutions
