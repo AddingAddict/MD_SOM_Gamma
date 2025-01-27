@@ -45,10 +45,10 @@ def lfp_sign_func(f, A, p0, q0, q2):
 
 def simulator(theta):
     '''
-    theta[0] = (|Weff_EE|+|Weff_II|)/2
+    theta[0] = (τ_E*|Weff_EE|+τ_I*|Weff_II|)/√(τ_E^2+τ_I^2)
     theta[1] = |Weff_EI|
     theta[2] = |Weff_IE|
-    theta[3] = (|Weff_EE|-|Weff_II|)/2
+    theta[3] = (τ_I*|Weff_EE|-τ_E*|Weff_II|)/√(τ_E^2+τ_I^2)
     theta[4] = r(eta_E,eta_I)
     theta[5] = |eta_I|/|eta_E|
     
@@ -57,10 +57,10 @@ def simulator(theta):
     wr = width of peak
     Ar = amplitude of peak (relative to amplitude at 50 Hz)
     '''
-    Weff_EE =  (theta[0] + theta[3])
+    Weff_EE =  torch.maximum(torch.tensor([0]),theta[0]*t[0] + theta[3]*t[1])/torch.sqrt(t[0]**2+t[1]**2)
     Weff_EI = -theta[1]
     Weff_IE =  theta[2]
-    Weff_II = -(theta[0] - theta[3])
+    Weff_II = -torch.maximum(torch.tensor([0]),theta[0]*t[1] - theta[3]*t[0])/torch.sqrt(t[0]**2+t[1]**2)
     c = theta[4]
     a = theta[5]
     
