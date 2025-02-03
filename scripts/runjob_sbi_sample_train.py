@@ -21,7 +21,7 @@ def runjobs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tE', '-tE', help='excitatory time constant (s)', type=float, default=0.02)
     parser.add_argument('--tI', '-tI', help='inhibitory time constant (s)', type=float, default=0.01)
-    parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=200)
+    parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=100)
     parser.add_argument('--max_corr', '-maxc', help='maximum correlation coefficient for E/I noise', type=float, default=1)
     parser.add_argument('--max_Iamp', '-maxa', help='maximum ratio of I to E noise amplitude', type=float, default=2)
     parser.add_argument('--num_sim', '-n', help='number of simulations', type=int, default=10000000)
