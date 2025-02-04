@@ -150,8 +150,7 @@ x_obs = torch.tensor([frn,wrn,Arn])
 x_err = torch.tensor([frs,wrs,Ars])
 
 def criterion_fn(samples):
-    return torch.logical_and(torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1,
-                             simulator_robustness(samples,eps=0.01,tol=0.05))
+    return torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1
 
 samples = sample_posterior(posterior,x_obs,num_samples,test_samples,criterion_fn)
 
