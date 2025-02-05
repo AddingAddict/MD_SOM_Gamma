@@ -21,9 +21,9 @@ def runjobs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tE', '-tE', help='excitatory time constant (s)', type=float, default=0.02)
     parser.add_argument('--tI', '-tI', help='inhibitory time constant (s)', type=float, default=0.01)
-    parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=100)
-    parser.add_argument('--max_corr', '-maxc', help='maximum correlation coefficient for E/I noise', type=float, default=1)
-    parser.add_argument('--max_Iamp', '-maxa', help='maximum ratio of I to E noise amplitude', type=float, default=2)
+    # parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=100)
+    # parser.add_argument('--max_corr', '-maxc', help='maximum correlation coefficient for E/I noise', type=float, default=1)
+    # parser.add_argument('--max_Iamp', '-maxa', help='maximum ratio of I to E noise amplitude', type=float, default=2)
     parser.add_argument('--num_sim', '-n', help='number of simulations', type=int, default=10000000)
     parser.add_argument('--test', '-t', type=int, default=0)
     parser.add_argument('--cluster_', default='burg')
@@ -35,9 +35,9 @@ def runjobs():
     
     tE = args['tE']
     tI = args['tI']
-    maxW = args['max_coup']
-    maxc = args['max_corr']
-    maxa = args['max_Iamp']
+    # maxW = args['max_coup']
+    # maxc = args['max_corr']
+    # maxa = args['max_Iamp']
     num_simulations = args['num_sim']
     
     gpu = args['gpu'] > 0
@@ -100,8 +100,10 @@ def runjobs():
     #--------------------------------------------------------------------------
     # Make SBTACH
     inpath = currwd + "/sbi_sample_train.py"
-    c1 = "{:s} -tE {:.3f} -tI {:.3f} -maxW {:.1f} -maxc {:.1f} -maxa {:.1f} -n {:d}".format(
-        inpath,tE,tI,maxW,maxc,maxa,num_simulations)
+    # c1 = "{:s} -tE {:.3f} -tI {:.3f} -maxW {:.1f} -maxc {:.1f} -maxa {:.1f} -n {:d}".format(
+    #     inpath,tE,tI,maxW,maxc,maxa,num_simulations)
+    c1 = "{:s} -tE {:.3f} -tI {:.3f} -n {:d}".format(
+        inpath,tE,tI,num_simulations)
     jobname="sbi_sample_train"+"-tE={:.3f}-tI={:.3f}-n={:d}".format(
             tE,tI,num_simulations)
             
