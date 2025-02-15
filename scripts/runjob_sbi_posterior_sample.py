@@ -20,11 +20,11 @@ def runjobs():
     # Test commands option
     parser = argparse.ArgumentParser()
     parser.add_argument('--obs_file', '-o',  help='file name of the observed data', required=True)
-    parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.02)
-    parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.01)
-    parser.add_argument('--max_coup', '-maxW', help='maximum effective coupling magnitude', type=float, default=100)
-    parser.add_argument('--max_corr', '-maxc', help='maximum correlation coefficient for E/I noise', type=float, default=1)
-    parser.add_argument('--max_Iamp', '-maxa', help='maximum ratio of I to E noise amplitude', type=float, default=2)
+    parser.add_argument('--tE', '-tE',  help='excitatory time constant (s)', type=float, default=0.005)
+    parser.add_argument('--tI', '-tI',  help='inhibitory time constant (s)', type=float, default=0.007)
+    # parser.add_argument('--max_coup', '-maxW',  help='effective coupling order of magnitude', type=float, default=2)
+    # parser.add_argument('--max_corr', '-maxc',  help='maximum correlation coefficient for E/I noise', type=float, default=1)
+    # parser.add_argument('--max_Iamp', '-maxa',  help='ratio of I to E noise order of magnitude', type=float, default=1)
     parser.add_argument('--num_sim', '-n',  help='number of simulations', type=int, default=10000000)
     parser.add_argument('--num_samp', '-p',  help='number of posterior samples', type=int, default=10000000)
     parser.add_argument('--test', '-t', type=int, default=0)
@@ -38,9 +38,9 @@ def runjobs():
     obs_file = args['obs_file']
     tE = args['tE']
     tI = args['tI']
-    maxW = args['max_coup']
-    maxc = args['max_corr']
-    maxa = args['max_Iamp']
+    # maxW = args['max_coup']
+    # maxc = args['max_corr']
+    # maxa = args['max_Iamp']
     num_simulations = args['num_sim']
     num_samples = args['num_samp']
     
@@ -104,8 +104,8 @@ def runjobs():
     #--------------------------------------------------------------------------
     # Make SBTACH
     inpath = currwd + "/sbi_posterior_sample.py"
-    c1 = "{:s} -o {:s} -tE {:.3f} -tI {:.3f} -maxW {:.1f} -maxc {:.1f} -maxa {:.1f} -n {:d} -p {:d}".format(
-        inpath,obs_file,tE,tI,maxW,maxc,maxa,num_simulations,num_samples)
+    c1 = "{:s} -o {:s} -tE {:.3f} -tI {:.3f} -n {:d} -p {:d}".format(
+        inpath,obs_file,tE,tI,num_simulations,num_samples)
     jobname="sbi_posterior_sample"+"-o={:s}-n={:d}".format(
             obs_file,num_samples)
             
