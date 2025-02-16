@@ -48,7 +48,7 @@ def skew_func(x):
 
 def simulator(theta):
     '''
-    theta[:,0] = log10[(τ_E*|Weff_EE|+τ_I*|Weff_II|)/√(τ_E^2+τ_I^2)]
+    theta[:,0] = log10[(τ_E*|Weff_EE|+τ_I*|Weff_II|)/√(τ_E^2+τ_I^2) - min_value]
     theta[:,1] = (τ_I*|Weff_EE|-τ_E*|Weff_II|)/√(τ_E^2+τ_I^2)
     theta[:,2] = (log10[|Weff_EI|] + log10[|Weff_IE|]) / 2
     theta[:,3] = (log10[|Weff_EI|] - log10[|Weff_IE|]) / 2
@@ -67,10 +67,11 @@ def simulator(theta):
 
     tE = t[0]
     tI = t[1]
-    Weff_EE =  (10**theta[:,0]*tE + theta[:,1]*tI)/torch.sqrt(tE**2+tI**2)
+    min_theta0 = torch.where(theta[:,1] > 0, tE/tI*theta[:,1], -tI/tE*theta[:,1])
+    Weff_EE =  ((10**theta[:,0]+min_theta0)*tE + theta[:,1]*tI)/torch.sqrt(tE**2+tI**2)
     Weff_EI = -10**(theta[:,2] + theta[:,3])
     Weff_IE =  10**(theta[:,2] - theta[:,3])
-    Weff_II = -(10**theta[:,0]*tI - theta[:,1]*tE)/torch.sqrt(tE**2+tI**2)
+    Weff_II = -((10**theta[:,0]+min_theta0)*tI - theta[:,1]*tE)/torch.sqrt(tE**2+tI**2)
     c = theta[:,4][:,None]
     a = 10**theta[:,5][:,None]
     
@@ -92,8 +93,6 @@ def simulator(theta):
     q2 = ((Weff_EE-1)**2*tI**2+2*Weff_EI*Weff_IE*tE*tI+\
         (Weff_II-1)**2*tE**2)/tE**2/tI**2/(2*np.pi)**2
     
-    valid_idx = (lam < 0) & (q2**2 < 4*q0) & (Weff_EE > 0) & (Weff_II < 0)
-    
     #### f
     out[:,0,:] = torch.sqrt(torch.sqrt(p0**2-p0*q2+q0) - p0)
     
@@ -103,9 +102,9 @@ def simulator(theta):
     #### l
     out[:,2,:] = skew_func((4*p0 - q2 + 2*out[:,0,:]**2) / (p0 + out[:,0,:]**2)**2 / (4*q0 - q2**2) * out[:,1,:]**6)
     
-    valid_idx = torch.logical_and(lam < 0,q2**2 < 4*q0)
-    
-    torch.where(valid_idx[:,None,:],out,torch.tensor([torch.nan])[:,None,None],out=out)
+    valid_idx = ((lam < 0) & (q2**2 < 4*q0) & (Weff_EE > 0) & (Weff_II < 0)).all(dim=1)
+
+    torch.where(valid_idx[:,None,None],out,torch.tensor([torch.nan])[:,None,None],out=out)
     
     err = out/out[:,:,81//2][:,:,None] - 1
     err[:,2,:] = (out[:,2,:] - out[:,2,81//2][:,None])/0.1
@@ -119,8 +118,8 @@ def simulator(theta):
 #                      torch.tensor([1.5,maxc,maxa],device=device),
 #                      num_coups=3,validate_args=True)
 
-prior = BoxUniform(low =torch.tensor([-2,-.5,np.log10(35*np.sqrt(t[0]*t[1])*2*np.pi),-4,0.0,-1],device=device),
-                   high=torch.tensor([ 1,2.0,np.log10(55*np.sqrt(t[0]*t[1])*2*np.pi), 4,1.0, 1],device=device),)
+prior = BoxUniform(low =torch.tensor([-2.0,-0.5,np.log10(35*np.sqrt(t[0]*t[1])*2*np.pi),-4,0.0,-1.0],device=device),
+                   high=torch.tensor([ 0.5, 1.5,np.log10(55*np.sqrt(t[0]*t[1])*2*np.pi), 3,1.0, 1.0],device=device),)
 
 posterior = train_posterior(prior,simulator,num_simulations,device)
 
