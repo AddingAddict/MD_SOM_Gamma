@@ -118,8 +118,8 @@ def simulator(theta):
 #                      torch.tensor([1.5,maxc,maxa],device=device),
 #                      num_coups=3,validate_args=True)
 
-prior = BoxUniform(low =torch.tensor([-2.0,-0.5,np.log10(35*np.sqrt(t[0]*t[1])*2*np.pi),-4,0.0,-1.0],device=device),
-                   high=torch.tensor([ 0.5, 1.5,np.log10(55*np.sqrt(t[0]*t[1])*2*np.pi), 3,1.0, 1.0],device=device),)
+prior = BoxUniform(low =torch.tensor([-2.0,-0.5,np.log10(35*np.sqrt(t[0]*t[1])*2*np.pi),-4.0,0.0,-1.0],device=device),
+                   high=torch.tensor([ 0.5, 1.5,np.log10(55*np.sqrt(t[0]*t[1])*2*np.pi), 3.0,1.0, 1.0],device=device),)
 
 posterior = train_posterior(prior,simulator,num_simulations,device)
 

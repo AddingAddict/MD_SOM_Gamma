@@ -1,3 +1,4 @@
+from multiprocessing import Process
 import time
 
 import torch
@@ -65,5 +66,67 @@ def sample_posterior(posterior,x_obs,num_samples,test_samples=100000,criterion_f
         samples = posterior.sample((num_samples,), x=x_obs)
 
         print('Sampling the required number for desired sample size took',time.process_time()-start,'s')
+        
+    return samples
+
+def sample_posterior_batch(posterior,x_obs_batch,num_samples,test_samples=100000,
+                           timeout_samples=5,timeout_per_samp=4,criterion_fn=None):
+    assert x_obs_batch.dim() == 2, 'x_obs_batch must have a batch dimension'
+    n_obs = x_obs_batch.shape[0]
+
+    start = time.process_time()
+    
+    fit_fracs = torch.zeros(n_obs,dtype=torch.int)
+    for batch_idx in range(n_obs):
+        # Check which observations allow successful sampling of posterior
+        p = Process(target=sample_posterior, args=(posterior,x_obs_batch[batch_idx],timeout_samples))
+        p.start()
+        
+        p.join(timeout_samples*timeout_per_samp)
+
+        if p.is_alive():
+            p.terminate()
+            p.join()
+            print('Batch',batch_idx,'failed')
+            continue
+        
+        p.close()
+        
+        print('Batch',batch_idx,'succeeded, proceeding')
+        
+        # Compute how many samples per observation are needed to get the desired number of total samples
+        samples = sample_posterior(posterior,x_obs_batch[batch_idx],test_samples)
+        if criterion_fn is not None:
+            fit_idx = criterion_fn(samples)
+            
+            print('\tBatch',batch_idx,'fit the criteria with',fit_idx.sum().item(),'samples')
+            fit_fracs[batch_idx] = fit_idx.sum().item() / test_samples
+        else:
+            fit_fracs[batch_idx] = 1
+    
+    if criterion_fn is not None:
+        required_samples = int(num_samples/fit_fracs.sum()*1.05)
+    else:
+        required_samples = int(num_samples/fit_fracs.sum())
+    print('required samples:', required_samples)
+
+    print('Test sampling took',time.process_time()-start,'s')
+
+    start = time.process_time()
+    
+    samples = None
+    for batch_idx in range(n_obs):
+        if fit_fracs[batch_idx] == 0:
+            continue
+        
+        this_samples = posterior.sample((required_samples,), x=x_obs_batch[batch_idx])
+        fit_idx = criterion_fn(this_samples)
+        samples = this_samples[fit_idx,:]
+        if samples is None:
+            samples = this_samples
+        else:
+            sample = torch.cat((samples,this_samples),dim=0)
+
+    print('Sampling the required number for desired sample size took',time.process_time()-start,'s')
         
     return samples
