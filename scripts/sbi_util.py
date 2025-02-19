@@ -76,7 +76,7 @@ def sample_posterior_batch(posterior,x_obs_batch,num_samples,test_samples=100000
 
     start = time.process_time()
     
-    fit_fracs = torch.zeros(n_obs,dtype=torch.int)
+    fit_fracs = torch.zeros(n_obs)
     for batch_idx in range(n_obs):
         # Check which observations allow successful sampling of posterior
         p = Process(target=sample_posterior, args=(posterior,x_obs_batch[batch_idx],timeout_samples))
@@ -125,7 +125,7 @@ def sample_posterior_batch(posterior,x_obs_batch,num_samples,test_samples=100000
         if samples is None:
             samples = this_samples
         else:
-            sample = torch.cat((samples,this_samples),dim=0)
+            samples = torch.cat((samples,this_samples),dim=0)
 
     print('Sampling the required number for desired sample size took',time.process_time()-start,'s')
         

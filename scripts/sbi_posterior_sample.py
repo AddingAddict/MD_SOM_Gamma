@@ -158,7 +158,7 @@ x_obs_batch = torch.normal(x_obs[None,:]*torch.ones((n_obs,3)),
                            x_err[None,:]*torch.ones((n_obs,3)))
 
 def criterion_fn(samples):
-    return torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 1.5
+    return torch.sqrt((((simulator(samples)-x_obs[None,:])/x_err[None,:])**2).sum(-1)) < 2
 
 samples = sample_posterior_batch(posterior,x_obs_batch,num_samples,test_samples=test_samples,
                                  timeout_samples=2,timeout_per_samp=10,criterion_fn=criterion_fn)
